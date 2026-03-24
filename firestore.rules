@@ -1,0 +1,148 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields: uid, email, displayName, role, studentId, department, photoURL, createdAt
+    //
+    // Collection: announcements
+    // Document ID: {announcementId}
+    // Fields: title, content, authorId, authorName, category, createdAt
+    //
+    // Collection: courses
+    // Document ID: {courseId}
+    // Fields: code, name, facultyId, description
+    //
+    // Collection: timetables
+    // Document ID: {entryId}
+    // Fields: courseCode, courseName, day, startTime, endTime, location, facultyId
+    //
+    // Collection: attendance
+    // Document ID: {recordId}
+    // Fields: studentId, studentName, courseCode, date, status, recordedBy
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "emilymutonyi354@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isFaculty() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'faculty';
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'studentId', 'department', 'photoURL', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['student', 'faculty', 'admin'];
+    }
+
+    function isValidAnnouncement(data) {
+      return hasRequiredFields(['title', 'content', 'authorId', 'category', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
+             data.category in ['academic', 'event', 'emergency', 'general'];
+    }
+
+    function isValidCourse(data) {
+      return hasRequiredFields(['code', 'name', 'facultyId']) &&
+             data.code is string && data.code.size() > 0 &&
+             data.name is string && data.name.size() > 0;
+    }
+
+    function isValidTimetable(data) {
+      return hasRequiredFields(['courseCode', 'day', 'startTime', 'endTime', 'location']) &&
+             data.day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    }
+
+    function isValidAttendance(data) {
+      return hasRequiredFields(['studentId', 'courseCode', 'date', 'status']) &&
+             data.status in ['present', 'absent', 'late'];
+    }
+
+    function isValidRegistration(data) {
+      return hasRequiredFields(['studentId', 'courseId', 'registeredAt']) &&
+             data.studentId is string &&
+             data.courseId is string;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role != 'admin' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isFaculty()) && isValidAnnouncement(request.resource.data);
+      allow update: if (isAdmin() || (isFaculty() && resource.data.authorId == request.auth.uid)) && isValidAnnouncement(request.resource.data);
+      allow delete: if isAdmin() || (isFaculty() && resource.data.authorId == request.auth.uid);
+    }
+
+    match /courses/{courseId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || (isFaculty() && request.resource.data.facultyId == request.auth.uid)) && isValidCourse(request.resource.data);
+      allow update: if (isAdmin() || (isFaculty() && resource.data.facultyId == request.auth.uid && request.resource.data.facultyId == request.auth.uid)) && isValidCourse(request.resource.data);
+      allow delete: if isAdmin() || (isFaculty() && resource.data.facultyId == request.auth.uid);
+    }
+
+    match /timetables/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isFaculty()) && isValidTimetable(request.resource.data);
+      allow update: if (isAdmin() || isFaculty()) && isValidTimetable(request.resource.data);
+      allow delete: if isAdmin() || isFaculty();
+    }
+
+    match /attendance/{recordId} {
+      allow read: if isAuthenticated() && (isAdmin() || isFaculty() || request.auth.uid == resource.data.studentId);
+      allow create: if (isAdmin() || isFaculty()) && isValidAttendance(request.resource.data);
+      allow update: if (isAdmin() || isFaculty()) && isValidAttendance(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /registrations/{registrationId} {
+      allow read: if isAuthenticated() && (isAdmin() || isFaculty() || request.auth.uid == resource.data.studentId);
+      allow create: if isAuthenticated() && (isAdmin() || request.auth.uid == request.resource.data.studentId) && isValidRegistration(request.resource.data);
+      allow delete: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.studentId);
+    }
+  }
+}

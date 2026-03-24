@@ -1,0 +1,5 @@
+{
+  "name": "CampusConnect Student Portal",
+  "description": "A centralized academic hub for university students and faculty, featuring real-time timetables, attendance tracking, and campus-wide announcements.",
+  "requestFramePermissions": []
+}

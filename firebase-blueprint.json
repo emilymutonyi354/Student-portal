@@ -1,0 +1,95 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "Stores student and faculty profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email", "description": "University email" },
+        "displayName": { "type": "string", "description": "Full name" },
+        "role": { "type": "string", "enum": ["student", "faculty", "admin"], "description": "User role" },
+        "studentId": { "type": "string", "description": "Student registration number (optional for faculty)" },
+        "department": { "type": "string", "description": "Academic department" },
+        "photoURL": { "type": "string", "description": "Profile picture URL" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "announcements": {
+      "title": "Campus Announcement",
+      "description": "Official updates from the university.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "category": { "type": "string", "enum": ["academic", "event", "emergency", "general"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "authorId", "category", "createdAt"]
+    },
+    "courses": {
+      "title": "Course",
+      "description": "Academic course details.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Course code (e.g., CS101)" },
+        "name": { "type": "string" },
+        "facultyId": { "type": "string", "description": "Lecturer in charge" },
+        "description": { "type": "string" }
+      },
+      "required": ["code", "name", "facultyId"]
+    },
+    "timetables": {
+      "title": "Timetable Entry",
+      "description": "Schedule for a specific course session.",
+      "type": "object",
+      "properties": {
+        "courseCode": { "type": "string" },
+        "courseName": { "type": "string" },
+        "day": { "type": "string", "enum": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] },
+        "startTime": { "type": "string", "description": "HH:mm format" },
+        "endTime": { "type": "string", "description": "HH:mm format" },
+        "location": { "type": "string" },
+        "facultyId": { "type": "string" }
+      },
+      "required": ["courseCode", "day", "startTime", "endTime", "location"]
+    },
+    "attendance": {
+      "title": "Attendance Record",
+      "description": "Logs student attendance for a session.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["present", "absent", "late"] },
+        "recordedBy": { "type": "string", "description": "Faculty UID" }
+      },
+      "required": ["studentId", "courseCode", "date", "status"]
+    },
+    "registrations": {
+      "title": "Course Registration",
+      "description": "Links a student to a course they are enrolled in.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "registeredAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "courseId", "registeredAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "users", "description": "User profiles" },
+    "/announcements/{announcementId}": { "schema": "announcements", "description": "Global announcements" },
+    "/courses/{courseId}": { "schema": "courses", "description": "Available courses" },
+    "/timetables/{entryId}": { "schema": "timetables", "description": "Class schedules" },
+    "/attendance/{recordId}": { "schema": "attendance", "description": "Attendance logs" },
+    "/registrations/{registrationId}": { "schema": "registrations", "description": "Student course registrations" }
+  }
+}
