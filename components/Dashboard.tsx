@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '@/firebase';
 import { useFirebase } from './FirebaseProvider';
 import { motion } from 'motion/react';
 import { Bell, Calendar, ClipboardCheck, ArrowRight, Info } from 'lucide-react';
@@ -23,8 +23,9 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const path = 'announcements';
     const q = query(
-      collection(db, 'announcements'),
+      collection(db, path),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
@@ -37,7 +38,7 @@ export const Dashboard: React.FC = () => {
       setAnnouncements(data);
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching announcements:", error);
+      handleFirestoreError(error, OperationType.GET, path);
       setLoading(false);
     });
 
@@ -106,11 +107,17 @@ export const Dashboard: React.FC = () => {
         <section>
           <h3 className="text-lg font-semibold mb-4">Faculty Actions</h3>
           <div className="space-y-4">
-            <button className="w-full p-4 bg-white border border-black/5 rounded-2xl text-left hover:bg-slate-50 transition-colors flex items-center justify-between group">
+            <button 
+              onClick={() => window.location.hash = 'announcements'}
+              className="w-full p-4 bg-white border border-black/5 rounded-2xl text-left hover:bg-slate-50 transition-colors flex items-center justify-between group"
+            >
               <span className="font-medium">Post Announcement</span>
               <ArrowRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
             </button>
-            <button className="w-full p-4 bg-white border border-black/5 rounded-2xl text-left hover:bg-slate-50 transition-colors flex items-center justify-between group">
+            <button 
+              onClick={() => window.location.hash = 'timetable'}
+              className="w-full p-4 bg-white border border-black/5 rounded-2xl text-left hover:bg-slate-50 transition-colors flex items-center justify-between group"
+            >
               <span className="font-medium">Manage Timetable</span>
               <ArrowRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
             </button>
@@ -124,11 +131,17 @@ export const Dashboard: React.FC = () => {
         <section>
           <h3 className="text-lg font-semibold mb-4">Admin Console</h3>
           <div className="space-y-4">
-            <button className="w-full p-4 bg-slate-900 text-white rounded-2xl text-left hover:bg-slate-800 transition-colors flex items-center justify-between group">
+            <button 
+              onClick={() => window.location.hash = 'users'}
+              className="w-full p-4 bg-slate-900 text-white rounded-2xl text-left hover:bg-slate-800 transition-colors flex items-center justify-between group"
+            >
               <span className="font-medium">User Management</span>
               <ArrowRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
             </button>
-            <button className="w-full p-4 bg-white border border-black/5 rounded-2xl text-left hover:bg-slate-50 transition-colors flex items-center justify-between group">
+            <button 
+              onClick={() => window.location.hash = 'system'}
+              className="w-full p-4 bg-white border border-black/5 rounded-2xl text-left hover:bg-slate-50 transition-colors flex items-center justify-between group"
+            >
               <span className="font-medium">System Logs</span>
               <ArrowRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
             </button>
@@ -183,7 +196,10 @@ export const Dashboard: React.FC = () => {
                 <Bell size={20} className="text-indigo-500" />
                 Latest Announcements
               </h2>
-              <button className="text-sm text-indigo-600 font-medium hover:underline flex items-center gap-1">
+              <button 
+                onClick={() => window.location.hash = 'announcements'}
+                className="text-sm text-indigo-600 font-medium hover:underline flex items-center gap-1"
+              >
                 View All <ArrowRight size={14} />
               </button>
             </div>
@@ -236,7 +252,10 @@ export const Dashboard: React.FC = () => {
             <div className="relative z-10">
               <h3 className="text-xl font-bold mb-2">Exam Season</h3>
               <p className="text-slate-400 text-sm mb-6">Final exams start in 12 days. Make sure your registration is complete.</p>
-              <button className="w-full py-3 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors">
+              <button 
+                onClick={() => window.location.hash = 'timetable'}
+                className="w-full py-3 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors"
+              >
                 View Exam Schedule
               </button>
             </div>

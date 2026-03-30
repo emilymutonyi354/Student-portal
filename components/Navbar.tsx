@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useFirebase } from './FirebaseProvider';
-import { auth, db } from '@/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '@/firebase';
 import { signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { LogOut, User as UserIcon, Bell, Calendar, ClipboardCheck, LayoutDashboard, Loader2, BookOpen } from 'lucide-react';
@@ -19,7 +20,7 @@ export const Navbar: React.FC = () => {
     
     try {
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
+      // Removed prompt: 'select_account' for faster login
       
       await signInWithPopup(auth, provider);
     } catch (error: any) {
@@ -40,14 +41,15 @@ export const Navbar: React.FC = () => {
 
   const switchRole = async (newRole: 'student' | 'faculty' | 'admin') => {
     if (!user) return;
+    const path = `users/${user.uid}`;
     try {
       await setDoc(doc(db, 'users', user.uid), {
         ...profile,
         role: newRole
       }, { merge: true });
-      window.location.reload();
+      // No reload needed, onSnapshot in FirebaseProvider handles it
     } catch (error) {
-      console.error("Error switching role:", error);
+      handleFirestoreError(error, OperationType.WRITE, path);
     }
   };
 
@@ -63,31 +65,31 @@ export const Navbar: React.FC = () => {
 
         {user && profile && (
           <div className="hidden md:flex items-center gap-1">
-            <NavLink href="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
+            <NavLink href="/#dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" />
             
             {profile.role === 'student' && (
               <>
-                <NavLink href="/courses" icon={<BookOpen size={18} />} label="Courses" />
-                <NavLink href="/timetable" icon={<Calendar size={18} />} label="Timetable" />
-                <NavLink href="/attendance" icon={<ClipboardCheck size={18} />} label="Attendance" />
+                <NavLink href="/#courses" icon={<BookOpen size={18} />} label="Courses" />
+                <NavLink href="/#timetable" icon={<Calendar size={18} />} label="Timetable" />
+                <NavLink href="/#attendance" icon={<ClipboardCheck size={18} />} label="Attendance" />
               </>
             )}
 
             {profile.role === 'faculty' && (
               <>
-                <NavLink href="/courses" icon={<Calendar size={18} />} label="My Courses" />
-                <NavLink href="/attendance/record" icon={<ClipboardCheck size={18} />} label="Record Attendance" />
+                <NavLink href="/#courses" icon={<Calendar size={18} />} label="My Courses" />
+                <NavLink href="/#attendance-record" icon={<ClipboardCheck size={18} />} label="Record Attendance" />
               </>
             )}
 
             {profile.role === 'admin' && (
               <>
-                <NavLink href="/users" icon={<UserIcon size={18} />} label="Users" />
-                <NavLink href="/system" icon={<ClipboardCheck size={18} />} label="System" />
+                <NavLink href="/#users" icon={<UserIcon size={18} />} label="Users" />
+                <NavLink href="/#system" icon={<ClipboardCheck size={18} />} label="System" />
               </>
             )}
 
-            <NavLink href="/announcements" icon={<Bell size={18} />} label="Announcements" />
+            <NavLink href="/#announcements" icon={<Bell size={18} />} label="Announcements" />
           </div>
         )}
       </div>
@@ -122,9 +124,15 @@ export const Navbar: React.FC = () => {
               <p className="text-xs text-slate-500 capitalize">{profile?.role || 'Student'}</p>
             </div>
             <div className="relative group">
-              <button className="w-10 h-10 rounded-full bg-slate-100 border border-black/5 overflow-hidden flex items-center justify-center">
+              <button className="w-10 h-10 rounded-full bg-slate-100 border border-black/5 overflow-hidden flex items-center justify-center relative">
                 {user.photoURL ? (
-                  <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                  <Image 
+                    src={user.photoURL} 
+                    alt="Profile" 
+                    fill 
+                    className="object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
                 ) : (
                   <UserIcon size={20} className="text-slate-400" />
                 )}

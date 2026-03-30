@@ -101,9 +101,21 @@ service cloud.firestore {
              data.courseId is string;
     }
 
+    function isValidMaterial(data) {
+      return hasRequiredFields(['courseId', 'title', 'fileUrl', 'uploadedBy', 'createdAt']) &&
+             data.courseId is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.fileUrl is string && data.fileUrl.size() > 0 &&
+             data.uploadedBy is string;
+    }
+
     // ===============================================================
     // Match Rules
     // ===============================================================
+
+    match /_connection_test_/{docId} {
+      allow read: if true;
+    }
 
     match /users/{userId} {
       allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
@@ -143,6 +155,13 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (isAdmin() || isFaculty() || request.auth.uid == resource.data.studentId);
       allow create: if isAuthenticated() && (isAdmin() || request.auth.uid == request.resource.data.studentId) && isValidRegistration(request.resource.data);
       allow delete: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.studentId);
+    }
+
+    match /materials/{materialId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || (isFaculty() && request.auth.uid == request.resource.data.uploadedBy)) && isValidMaterial(request.resource.data);
+      allow update: if (isAdmin() || (isFaculty() && request.auth.uid == resource.data.uploadedBy && request.auth.uid == request.resource.data.uploadedBy)) && isValidMaterial(request.resource.data);
+      allow delete: if isAdmin() || (isFaculty() && request.auth.uid == resource.data.uploadedBy);
     }
   }
 }

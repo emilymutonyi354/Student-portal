@@ -18,8 +18,7 @@ export const LoginView: React.FC = () => {
     
     try {
       const provider = new GoogleAuthProvider();
-      // Add custom parameters to force account selection and potentially avoid some race conditions
-      provider.setCustomParameters({ prompt: 'select_account' });
+      // Removed prompt: 'select_account' for faster login if already signed in
       
       await signInWithPopup(auth, provider);
     } catch (error: any) {

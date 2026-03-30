@@ -2,8 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, getDocFromServer } from 'firebase/firestore';
-import { auth, db } from '@/firebase';
+import { doc, onSnapshot, getDocFromServer } from 'firebase/firestore';
+import { auth, db, handleFirestoreError, OperationType } from '@/firebase';
 
 interface UserProfile {
   uid: string;
@@ -42,7 +42,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Test connection to Firestore
     const testConnection = async () => {
       try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
+        await getDocFromServer(doc(db, '_connection_test_', 'ping'));
       } catch (error) {
         if (error instanceof Error && error.message.includes('the client is offline')) {
           console.error("Please check your Firebase configuration.");
@@ -51,29 +51,44 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
     testConnection();
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeProfile: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      
+      // Clean up previous profile listener if it exists
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
       if (currentUser) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        const path = `users/${currentUser.uid}`;
+        // Use onSnapshot for real-time updates and faster perceived performance
+        unsubscribeProfile = onSnapshot(doc(db, 'users', currentUser.uid), (userDoc) => {
           if (userDoc.exists()) {
             setProfile(userDoc.data() as UserProfile);
           } else {
-            // We don't create the profile here anymore, we'll let the UI handle it
-            // so the user can choose their role.
             setProfile(null);
           }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-        }
+          setLoading(false);
+          setIsAuthReady(true);
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, path);
+          setLoading(false);
+          setIsAuthReady(true);
+        });
       } else {
         setProfile(null);
+        setLoading(false);
+        setIsAuthReady(true);
       }
-      setLoading(false);
-      setIsAuthReady(true);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }, []);
 
   return (

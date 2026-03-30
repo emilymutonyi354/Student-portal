@@ -82,6 +82,20 @@
         "registeredAt": { "type": "string", "format": "date-time" }
       },
       "required": ["studentId", "courseId", "registeredAt"]
+    },
+    "materials": {
+      "title": "Course Material",
+      "description": "Learning resources uploaded by faculty for a course.",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "fileUrl": { "type": "string", "description": "URL to the file or resource" },
+        "uploadedBy": { "type": "string", "description": "Faculty UID" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["courseId", "title", "fileUrl", "uploadedBy", "createdAt"]
     }
   },
   "firestore": {
@@ -90,6 +104,7 @@
     "/courses/{courseId}": { "schema": "courses", "description": "Available courses" },
     "/timetables/{entryId}": { "schema": "timetables", "description": "Class schedules" },
     "/attendance/{recordId}": { "schema": "attendance", "description": "Attendance logs" },
-    "/registrations/{registrationId}": { "schema": "registrations", "description": "Student course registrations" }
+    "/registrations/{registrationId}": { "schema": "registrations", "description": "Student course registrations" },
+    "/materials/{materialId}": { "schema": "materials", "description": "Course learning materials" }
   }
 }

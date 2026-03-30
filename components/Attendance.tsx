@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { db, handleFirestoreError, OperationType } from '@/firebase';
 import { useFirebase } from './FirebaseProvider';
 import { motion } from 'motion/react';
 import { ClipboardCheck, CheckCircle2, XCircle, Clock, Search } from 'lucide-react';
@@ -25,16 +25,17 @@ export const Attendance: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
+    const path = 'attendance';
     let q;
     if (profile?.role === 'student') {
       q = query(
-        collection(db, 'attendance'),
+        collection(db, path),
         where('studentId', '==', user.uid),
         orderBy('date', 'desc')
       );
     } else {
       q = query(
-        collection(db, 'attendance'),
+        collection(db, path),
         orderBy('date', 'desc')
       );
     }
@@ -47,7 +48,7 @@ export const Attendance: React.FC = () => {
       setRecords(data);
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching attendance:", error);
+      handleFirestoreError(error, OperationType.GET, path);
       setLoading(false);
     });
 

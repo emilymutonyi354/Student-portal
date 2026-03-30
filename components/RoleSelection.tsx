@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useFirebase } from './FirebaseProvider';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { db, handleFirestoreError, OperationType } from '@/firebase';
 import { motion } from 'motion/react';
 import { GraduationCap, BookOpen, ShieldCheck, Loader2 } from 'lucide-react';
 
@@ -16,6 +16,7 @@ export const RoleSelection: React.FC = () => {
     if (!user || !selectedRole || isSubmitting) return;
 
     setIsSubmitting(true);
+    const path = `users/${user.uid}`;
     try {
       const newProfile = {
         uid: user.uid,
@@ -27,14 +28,9 @@ export const RoleSelection: React.FC = () => {
       };
 
       await setDoc(doc(db, 'users', user.uid), newProfile);
-      // The FirebaseProvider onAuthStateChanged will pick up the new profile 
-      // when it re-runs or when the page is refreshed, but we might need 
-      // a manual refresh or a state update in FirebaseProvider if it doesn't.
-      // Actually, onAuthStateChanged won't re-run, but the user is already logged in.
-      // We should probably have a way to refresh the profile in FirebaseProvider.
-      window.location.reload(); 
+      // No need for reload, onSnapshot in FirebaseProvider will pick it up
     } catch (error) {
-      console.error("Error setting role:", error);
+      handleFirestoreError(error, OperationType.WRITE, path);
     } finally {
       setIsSubmitting(false);
     }

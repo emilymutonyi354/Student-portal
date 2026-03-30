@@ -1,5 +1,5 @@
-import { Courses } from '@/components/Courses';
+import { PortalLayout } from '@/components/PortalLayout';
 
 export default function CoursesPage() {
-  return <Courses />;
+  return <PortalLayout initialView="courses" />;
 }

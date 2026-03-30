@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { db, handleFirestoreError, OperationType } from '@/firebase';
 import { useFirebase } from './FirebaseProvider';
 import { motion } from 'motion/react';
 import { BookOpen, Plus, Edit2, Trash2, X, Info } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+
+import { CourseMaterialsModal } from './CourseMaterialsModal';
 
 interface Course {
   id: string;
@@ -38,6 +40,7 @@ export const Courses: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
+  const [materialsCourse, setMaterialsCourse] = useState<Course | null>(null);
   
   const [formData, setFormData] = useState({
     code: '',
@@ -49,8 +52,9 @@ export const Courses: React.FC = () => {
   useEffect(() => {
     // Fetch faculty members for mapping IDs to names
     const fetchFaculty = async () => {
+      const path = 'users';
       try {
-        const q = query(collection(db, 'users'), where('role', '==', 'faculty'));
+        const q = query(collection(db, path), where('role', '==', 'faculty'));
         const snapshot = await getDocs(q);
         const facultyMap: Record<string, string> = {};
         snapshot.docs.forEach(doc => {
@@ -58,13 +62,14 @@ export const Courses: React.FC = () => {
         });
         setFacultyMembers(facultyMap);
       } catch (error) {
-        console.error("Error fetching faculty members:", error);
+        handleFirestoreError(error, OperationType.GET, path);
       }
     };
     fetchFaculty();
 
     // Listen to courses
-    const q = query(collection(db, 'courses'));
+    const coursesPath = 'courses';
+    const q = query(collection(db, coursesPath));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -72,17 +77,23 @@ export const Courses: React.FC = () => {
       })) as Course[];
       setCourses(data);
       setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, coursesPath);
+      setLoading(false);
     });
 
     let unsubscribeRegistrations = () => {};
     if (profile?.role === 'student' && user?.uid) {
-      const regQuery = query(collection(db, 'registrations'), where('studentId', '==', user.uid));
+      const regPath = 'registrations';
+      const regQuery = query(collection(db, regPath), where('studentId', '==', user.uid));
       unsubscribeRegistrations = onSnapshot(regQuery, (snapshot) => {
         const data = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Registration[];
         setRegistrations(data);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, regPath);
       });
     }
 
@@ -119,25 +130,27 @@ export const Courses: React.FC = () => {
 
     try {
       if (editingCourse) {
+        const path = `courses/${editingCourse.id}`;
         await updateDoc(doc(db, 'courses', editingCourse.id), formData);
       } else {
-        await addDoc(collection(db, 'courses'), formData);
+        const path = 'courses';
+        await addDoc(collection(db, path), formData);
       }
       setShowModal(false);
     } catch (error) {
-      console.error("Error saving course:", error);
-      alert("Failed to save course. Please check permissions.");
+      const path = editingCourse ? `courses/${editingCourse.id}` : 'courses';
+      handleFirestoreError(error, editingCourse ? OperationType.UPDATE : OperationType.CREATE, path);
     }
   };
 
   const handleDelete = async () => {
     if (!courseToDelete) return;
+    const path = `courses/${courseToDelete}`;
     try {
       await deleteDoc(doc(db, 'courses', courseToDelete));
       setCourseToDelete(null);
     } catch (error) {
-      console.error("Error deleting course:", error);
-      alert("Failed to delete course. Please check permissions.");
+      handleFirestoreError(error, OperationType.DELETE, path);
     }
   };
 
@@ -153,15 +166,15 @@ export const Courses: React.FC = () => {
   const handleRegister = async (courseId: string) => {
     if (!user || profile?.role !== 'student') return;
     setRegisteringId(courseId);
+    const path = 'registrations';
     try {
-      await addDoc(collection(db, 'registrations'), {
+      await addDoc(collection(db, path), {
         studentId: user.uid,
         courseId,
         registeredAt: new Date().toISOString()
       });
     } catch (error) {
-      console.error("Error registering for course:", error);
-      alert("Failed to register for course.");
+      handleFirestoreError(error, OperationType.CREATE, path);
     } finally {
       setRegisteringId(null);
     }
@@ -173,11 +186,11 @@ export const Courses: React.FC = () => {
     if (!registration) return;
     
     setRegisteringId(courseId);
+    const path = `registrations/${registration.id}`;
     try {
       await deleteDoc(doc(db, 'registrations', registration.id));
     } catch (error) {
-      console.error("Error dropping course:", error);
-      alert("Failed to drop course.");
+      handleFirestoreError(error, OperationType.DELETE, path);
     } finally {
       setRegisteringId(null);
     }
@@ -251,27 +264,36 @@ export const Courses: React.FC = () => {
                 <p className="text-xs text-slate-400 font-medium mb-3">
                   Instructor: <span className="text-slate-700">{facultyMembers[course.facultyId] || 'Loading...'}</span>
                 </p>
-                {profile?.role === 'student' && (
-                  <div className="mt-2">
-                    {registrations.some(r => r.courseId === course.id) ? (
-                      <button
-                        onClick={() => handleDrop(course.id)}
-                        disabled={registeringId === course.id}
-                        className="w-full py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl font-bold text-sm hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                      >
-                        {registeringId === course.id ? 'Updating...' : 'Registered (Click to Drop)'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleRegister(course.id)}
-                        disabled={registeringId === course.id}
-                        className="w-full py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50"
-                      >
-                        {registeringId === course.id ? 'Registering...' : 'Register for Course'}
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div className="mt-2 space-y-2">
+                  <button
+                    onClick={() => setMaterialsCourse(course)}
+                    className="w-full py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-colors"
+                  >
+                    View Materials
+                  </button>
+                  
+                  {profile?.role === 'student' && (
+                    <>
+                      {registrations.some(r => r.courseId === course.id) ? (
+                        <button
+                          onClick={() => handleDrop(course.id)}
+                          disabled={registeringId === course.id}
+                          className="w-full py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl font-bold text-sm hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                        >
+                          {registeringId === course.id ? 'Updating...' : 'Registered (Click to Drop)'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleRegister(course.id)}
+                          disabled={registeringId === course.id}
+                          className="w-full py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50"
+                        >
+                          {registeringId === course.id ? 'Registering...' : 'Register for Course'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </motion.div>
           ))
@@ -292,6 +314,16 @@ export const Courses: React.FC = () => {
         onConfirm={handleDelete}
         onCancel={() => setCourseToDelete(null)}
       />
+
+      {/* Course Materials Modal */}
+      {materialsCourse && (
+        <CourseMaterialsModal
+          courseId={materialsCourse.id}
+          courseName={materialsCourse.name}
+          facultyId={materialsCourse.facultyId}
+          onClose={() => setMaterialsCourse(null)}
+        />
+      )}
 
       {/* Course Modal */}
       {showModal && (
